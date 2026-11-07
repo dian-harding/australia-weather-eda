@@ -1,0 +1,217 @@
+---
+title: "Exploratory Data Analysis: Australian Weather Dynamics"
+author: "Dian Harding"
+date: "2026-11-07"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    df_print: paged
+    theme: readable
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+## 1. Introduction & Data Cleaning
+
+This project examines meteorological observations across Australian monitoring stations during 2016. The objective is to evaluate atmospheric drivers of daily rainfall, assess distribution profiles, and identify geographic rainfall variations.
+
+```{r load-data}
+library(dplyr)
+
+# Load dataset and clean missing values
+rain <- read.csv("weatherAUS.csv", sep = ",", header = TRUE)
+rain <- na.omit(rain)
+head(rain, 4)
+```
+
+---
+
+## 2. Atmospheric Relationships: Maximum Temperature vs. Humidity at 3 PM
+
+We evaluate the relationship between peak daytime temperature (converted to Fahrenheit) and afternoon relative humidity levels, segmented by rain occurrence.
+
+```{r temp-humidity-analysis}
+set.seed(123)
+rain_sample <- rain %>%
+  sample_n(1000) %>%
+  mutate(
+    MaxTempF = (9 / 5) * MaxTemp + 32,
+    Colors = ifelse(RainToday == "Yes", "blue", "red")
+  )
+
+plot(
+  x = rain_sample$MaxTempF,
+  y = rain_sample$Humidity3pm,
+  col = rain_sample$Colors,
+  pch = 19,
+  xlab = "Maximum Temperature (°F)",
+  ylab = "Humidity at 3 PM (%)",
+  main = "Max Temperature vs. Humidity at 3 PM"
+)
+legend("topright", legend = c("Rained Today", "Did Not Rain"), col = c("blue", "red"), pch = 19)
+```
+
+**Interpretation:** The blue points indicate that days where rain occurred are mostly clustered at the upper part of the graph, showing high humidity levels (above 60%). This is logical because humid air supports the formation of rain. Meanwhile, the red points are scattered across the entire graph, but dominate the high-temperature areas with lower humidity levels.
+
+---
+
+## 3. Rainfall Distribution and Summary Statistics
+
+To evaluate the profile of daily precipitation on active rain days, we analyze the density distribution alongside parametric and non-parametric central tendencies.
+
+```{r rainfall-distribution}
+rain_days <- rain %>% filter(RainToday == "Yes")
+
+hist(
+  rain_days$Rainfall,
+  prob = TRUE,
+  col = "blue",
+  border = "green",
+  xlab = "Rainfall (mm)",
+  ylab = "Density",
+  main = "Density Histogram of Daily Rainfall (Rainy Days)",
+  breaks = 30
+)
+
+mean_rf <- mean(rain_days$Rainfall)
+median_rf <- median(rain_days$Rainfall)
+
+cat("Mean Rainfall (mm):", round(mean_rf, 2), "\n")
+cat("Median Rainfall (mm):", round(median_rf, 2), "\n")
+```
+
+**Interpretation:**  The shape of the graph decreases from left to right, showing that most rainy days are dominated by low-intensity rainfall because the tallest bars are located near zero, particularly in the range below 10 mm. Storm events or heavy rainfall exceeding 20 to 100 mm occur very rarely.
+And the median value of 4.8 mm corresponds to the leftmost bars close to the 0–10 mm range, which means that on rainy days, it is mostly light rainfall below 10 mm. Furthermore, the mean value of 8.78 mm is larger than the median value; this confirms the continuously declining right-skewed shape of the histogram (right-skewness) resulting from extreme heavy rainfall in the right tail.
+
+---
+
+## 4. Geographic Comparative Analysis
+
+### 4.1 Total Annual Rainfall (2016)
+
+```{r total-rainfall-location, fig.height=6, fig.width=10}
+rain_2016_total <- rain %>%
+  filter(grepl("/16$", Date)) %>%
+  group_by(Location) %>%
+  summarise(TotalRainfall = round(sum(Rainfall, na.rm = TRUE), 1))
+
+par(mar = c(7, 5, 4, 2))
+bp_a <- barplot(
+  rain_2016_total$TotalRainfall,
+  names.arg = rain_2016_total$Location,
+  col = "skyblue",
+  border = "darkblue",
+  space = 0.5,
+  ylim = c(0, max(rain_2016_total$TotalRainfall) * 1.2),
+  ylab = "Total Rainfall (mm)",
+  main = "Total Rainfall by Location in 2016",
+  las = 2,
+  cex.names = 0.75
+)
+
+text(
+  x = bp_a,
+  y = rain_2016_total$TotalRainfall,
+  labels = rain_2016_total$TotalRainfall,
+  pos = 3,
+  cex = 0.55
+)
+par(mar = c(5, 4, 4, 2))
+```
+
+**Interpretation:** In 2016, Australia’s recorded rainfall in the regions of Darwin (1,064.4 mm), Sydney (1,068 mm), and Sydney Airport (1,034 mm) had the highest rainfall, exceeding 1,000 mm. Meanwhile, the regions of Alice Springs (54.8 mm) and Woomera (58.1 mm) had the lowest rainfall, indicating that they are dry regions. Therefore, the total rainfall of each region is influenced by its respective location, where coastal areas and tropical regions experience more rain compared to the dry central / inland regions.
+
+
+### 4.2 Average Daily Rainfall by Location
+
+```{r avg-rainfall-location, fig.height=6, fig.width=10}
+rain_loc_avg <- rain %>%
+  group_by(Location) %>%
+  summarise(AvgRainfall = round(mean(Rainfall, na.rm = TRUE), 2))
+
+par(mar = c(7, 5, 4, 2))
+bp_b <- barplot(
+  rain_loc_avg$AvgRainfall,
+  names.arg = rain_loc_avg$Location,
+  col = "lightgreen",
+  border = "darkgreen",
+  space = 0.5,
+  ylim = c(0, max(rain_loc_avg$AvgRainfall) * 1.2),
+  ylab = "Average Daily Rainfall (mm)",
+  main = "Average Daily Rainfall by Location",
+  las = 2,
+  cex.names = 0.75
+)
+
+text(
+  x = bp_b,
+  y = rain_loc_avg$AvgRainfall,
+  labels = rain_loc_avg$AvgRainfall,
+  pos = 3,
+  cex = 0.65
+)
+par(mar = c(5, 4, 4, 2))
+```
+
+**Interpretation:** The highest average daily rainfall is held by the Norfolk Island region at 3.94 mm, followed by Sydney (3.17 mm), Darwin (3.02 mm), and Sydney Airport (2.95 mm). Meanwhile, for the central / inland regions, rainfall is the lowest, such as Alice Springs (0.57 mm) and Woomera (0.62 mm). This geographic pattern is identical to the total rainfall in Part A, where coastal and tropical regions have a much higher average daily rainfall compared to the dry central / inland regions of Australia.
+
+
+### 4.3 Total Rainy Days Frequency (2016)
+
+```{r rainy-days-location, fig.height=6, fig.width=10}
+rain_2016_days <- rain %>%
+  filter(grepl("/16$", Date), RainToday == "Yes" | Rainfall > 0) %>%
+  group_by(Location) %>%
+  summarise(DaysRained = n())
+
+par(mar = c(7, 5, 4, 2))
+bp_c <- barplot(
+  rain_2016_days$DaysRained,
+  names.arg = rain_2016_days$Location,
+  col = "coral",
+  border = "darkred",
+  space = 0.4,
+  ylim = c(0, max(rain_2016_days$DaysRained) * 1.2),
+  ylab = "Number of Days Rained",
+  main = "Total Count of Days Rained by Location in 2016",
+  las = 2,
+  cex.names = 0.75
+)
+
+text(
+  x = bp_c,
+  y = rain_2016_days$DaysRained,
+  labels = rain_2016_days$DaysRained,
+  pos = 3,
+  cex = 0.65
+)
+par(mar = c(5, 4, 4, 2))
+```
+
+**Interpretation:** In 2016, the highest total count of rainy days was in the Hobart region, recording 159 rainy days, followed by MelbourneAirport (154 days), Watsonia (151 days), and Melbourne (126 days). Other regions that also experienced more than 100 rainy days include Sydney (118 days), SydneyAirport (116 days), as well as eastern/northern coastal areas such as Brisbane (114 days) and Darwin (113 days). Meanwhile, for the central / inland regions of Australia, Woomera had the fewest rainy days at 8 days, and Alice Springs recorded 10 rainy
+days. Other regions that also had few rainy days include Moree (12 days), Nuriootpa (13 days), and Williamtown (15 days). This indicates that the Hobart and Melbourne regions have the most frequent rainy days at over 150 days, even though their total rainfall volume in Part A was not as high as Darwin and Sydney. This indicates that southern regions frequently experience light rain / drizzle. On the other hand, the central / inland regions remain consistently dry, as their frequency of rainy days is also very rare.
+
+---
+
+## 5. Major Metro Distribution Comparison
+
+A side-by-side boxplot compares the rainfall spread across Brisbane, Melbourne, Perth, and Sydney.
+
+```{r metro-boxplots}
+rainCity <- rain %>%
+  filter(Location %in% c("Brisbane", "Melbourne", "Perth", "Sydney"), Rainfall > 0)
+
+boxplot(
+  Rainfall ~ Location,
+  data = rainCity,
+  main = "Daily Rainfall Distribution for Rainy Days",
+  xlab = "Location",
+  ylab = "Rainfall (mm)",
+  col = c("blue", "green", "orange", "red")
+)
+```
+
+**Interpretation:** The side-by-side boxplot graph shows that rainfall in Brisbane, Melbourne, Perth, and Sydney has a relatively low median value. Sydney and Brisbane are recorded as having extreme rainfall of more than 80 mm. Meanwhile, Melbourne has the smallest rainfall variation, with the thinnest box and the lowest outliers (all below 25 mm), which confirms that rain in Melbourne is generally dominated by light rain / drizzle. On the other hand, the Sydney region shows very high rainfall variation among the four cities, visible from the largest box and the highest vertical line compared to the other cities (20-25 mm).
